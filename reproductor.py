@@ -115,6 +115,7 @@ class MusicMinimalPlayer:
         self.player_monitor_thread = None
         self.time_monitor_running = False
         self.time_monitor_thread = None
+        self.song_paths = []
         
         self.setup_window()
         self.build_ui()
@@ -217,6 +218,9 @@ class MusicMinimalPlayer:
         
         self.drag_btn = self.create_drag_button(main_frame, "::", bg_color, font_color)
         self.drag_btn.pack(side=tk.LEFT, padx=0)
+        
+        self.playlist_btn = self.create_button(main_frame, "☰", self.open_playlist_window, btn_color, font_color)
+        self.playlist_btn.pack(side=tk.LEFT, padx=0)
         
         self.options_btn = self.create_button(main_frame, "⚙", self.open_options, btn_color, font_color)
         self.options_btn.pack(side=tk.LEFT, padx=0)
@@ -461,15 +465,6 @@ class MusicMinimalPlayer:
         opacity_scale.set(self.config["opacity"])
         opacity_scale.pack(anchor="w", padx=10, pady=(0, 8))
         
-        tk.Label(main_container, text="Playlist:", bg=bg_color, fg=font_color).pack(anchor="w", padx=10, pady=(2, 0))
-        playlist_var = tk.StringVar(value=self.current_playlist_name if self.current_playlist_name else "")
-        playlist_combo = ttk.Combobox(main_container, textvariable=playlist_var,
-                                     values=self.playlist_names,
-                                     state="readonly",
-                                     width=30)
-        playlist_combo.bind("<<ComboboxSelected>>", lambda e: self.on_playlist_change(playlist_var.get()))
-        playlist_combo.pack(anchor="w", padx=10, pady=(0, 2))
-        
         refresh_btn = tk.Button(main_container, text="Refresh Playlists",
                                bg=btn_color, fg=font_color, relief=tk.FLAT,
                                command=self.refresh_playlists)
@@ -528,6 +523,172 @@ class MusicMinimalPlayer:
                            bg=btn_color, fg=font_color, relief=tk.RAISED, bd=2)
         save_btn.pack(side=tk.LEFT, padx=5)
     
+    def open_playlist_window(self):
+        playlist_window = tk.Toplevel(self.root)
+        playlist_window.title("Playlist - " + (self.current_playlist_name or "No playlist"))
+        playlist_window.geometry("500x400")
+        playlist_window.configure(bg=self.config["bg_color"])
+        playlist_window.transient(self.root)
+        playlist_window.grab_set()
+        playlist_window.resizable(True, True)
+        
+        bg_color = self.config["bg_color"]
+        btn_color = self.config["btn_color"]
+        font_color = self.config["font_color"]
+        
+        main_frame = tk.Frame(playlist_window, bg=bg_color)
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=15, pady=15)
+        
+        playlist_label = tk.Label(
+            main_frame,
+            text="Seleccionar Playlist:",
+            bg=bg_color,
+            fg=font_color,
+            font=("Arial", 9)
+        )
+        playlist_label.pack(anchor="w")
+        
+        playlist_var = tk.StringVar(value=self.current_playlist_name if self.current_playlist_name else "")
+        playlist_combo = ttk.Combobox(main_frame, textvariable=playlist_var,
+                                     values=self.playlist_names,
+                                     state="readonly",
+                                     width=40)
+        playlist_combo.pack(fill=tk.X, pady=(0, 10))
+        
+        def on_playlist_change(event=None):
+            new_playlist = playlist_var.get()
+            if new_playlist and new_playlist != self.current_playlist_name:
+                self.current_playlist_name = new_playlist
+                self.config["playlist"] = self.current_playlist_name
+                self.current_index = 0
+                self._load_current_playlist()
+                save_config(self.config)
+                info_label.config(text=f"Playlist: {self.current_playlist_name} ({len(self.current_playlist_files)} canciones)")
+                update_song_list()
+        
+        playlist_combo.bind("<<ComboboxSelected>>", on_playlist_change)
+        
+        info_label = tk.Label(
+            main_frame,
+            text=f"Playlist: {self.current_playlist_name or 'No playlist'} ({len(self.current_playlist_files)} canciones)",
+            bg=bg_color,
+            fg=font_color,
+            font=("Arial", 10, "bold")
+        )
+        info_label.pack(pady=(0, 10))
+        
+        search_label = tk.Label(
+            main_frame,
+            text="Buscar canción:",
+            bg=bg_color,
+            fg=font_color,
+            font=("Arial", 9)
+        )
+        search_label.pack(anchor="w")
+        
+        search_var = tk.StringVar()
+        search_entry = tk.Entry(
+            main_frame,
+            textvariable=search_var,
+            bg=btn_color,
+            fg=font_color,
+            insertbackground=font_color,
+            relief=tk.SOLID,
+            bd=1,
+            highlightthickness=0,
+            font=("Arial", 9)
+        )
+        search_entry.pack(fill=tk.X, pady=(5, 10))
+        search_entry.focus_set()
+        
+        list_frame = tk.Frame(main_frame, bg=btn_color, relief=tk.SUNKEN, bd=1)
+        list_frame.pack(fill=tk.BOTH, expand=True)
+        
+        scrollbar = tk.Scrollbar(list_frame)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        song_listbox = tk.Listbox(
+            list_frame,
+            bg=btn_color,
+            fg=font_color,
+            font=("Arial", 9),
+            yscrollcommand=scrollbar.set,
+            selectmode=tk.SINGLE,
+            activestyle=tk.NONE,
+            highlightthickness=0,
+            bd=0,
+            relief=tk.FLAT
+        )
+        song_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.config(command=song_listbox.yview)
+        
+        def update_song_list(search_term=""):
+            song_listbox.delete(0, tk.END)
+            self.song_paths = []
+            songs_to_show = []
+            
+            if search_term:
+                search_term_lower = search_term.lower()
+                for file_path in self.current_playlist_files:
+                    filename = os.path.basename(file_path)
+                    if search_term_lower in filename.lower():
+                        songs_to_show.append(file_path)
+            else:
+                songs_to_show = self.current_playlist_files
+            
+            for i, file_path in enumerate(songs_to_show):
+                filename = os.path.basename(file_path)
+                if file_path in self.current_playlist_files:
+                    index_in_playlist = self.current_playlist_files.index(file_path)
+                    display_text = f"{index_in_playlist + 1:2d}. {filename}"
+                else:
+                    display_text = filename
+                song_listbox.insert(tk.END, display_text)
+                self.song_paths.append(file_path)
+        
+        def on_search_change(*args):
+            update_song_list(search_var.get())
+        
+        search_var.trace('w', on_search_change)
+        
+        def on_song_select(event):
+            if song_listbox.curselection():
+                selected_index = song_listbox.curselection()[0]
+                if selected_index < len(self.song_paths):
+                    file_path = self.song_paths[selected_index]
+                    try:
+                        song_index = self.current_playlist_files.index(file_path)
+                        self.play_song_at_index(song_index)
+                        playlist_window.destroy()
+                    except ValueError:
+                        pass
+        
+        song_listbox.bind('<Double-Button-1>', on_song_select)
+        
+        def on_key_press(event):
+            if event.keysym == 'Escape':
+                playlist_window.destroy()
+            elif event.keysym == 'Return' and song_listbox.curselection():
+                on_song_select(None)
+        
+        playlist_window.bind('<KeyPress>', on_key_press)
+        
+        close_btn = tk.Button(
+            main_frame,
+            text="Cerrar (ESC)",
+            command=playlist_window.destroy,
+            bg=btn_color,
+            fg=font_color,
+            activebackground=btn_color,
+            activeforeground=font_color,
+            relief=tk.FLAT,
+            font=("Arial", 9),
+            bd=0
+        )
+        close_btn.pack(pady=(10, 0))
+        
+        update_song_list()
+    
     def apply_colors(self):
         bg_color = self.config["bg_color"]
         btn_color = self.config["btn_color"]
@@ -560,6 +721,7 @@ class MusicMinimalPlayer:
         self.volume_up_btn.configure(bg=btn_color, fg=font_color)
         self.volume_down_btn.configure(bg=btn_color, fg=font_color)
         self.drag_btn.configure(bg=btn_color, fg=font_color)
+        self.playlist_btn.configure(bg=btn_color, fg=font_color)
         self.close_btn.configure(bg=btn_color, fg=font_color)
         
         if self.config["show_titlebar"]:

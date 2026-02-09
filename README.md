@@ -1,4 +1,4 @@
-# Simple Reproductor
+# Music Minimal Player
 
 A minimal and lightweight music player built with Python, tkinter, and VLC.
 
