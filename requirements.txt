@@ -1,0 +1,14 @@
+# Music Minimal Player - dependencias
+#
+# Instalar con:
+#   pip install -r requirements.txt
+#
+# Ademas hace falta VLC media player instalado en el sistema:
+#   Windows: https://get.videolan.org/vlc/3.0.21/win64/vlc-3.0.21-win64.exe
+# La arquitectura de Python y de VLC debe coincidir (64-bit recomendado).
+
+# Reproductor de audio/video. Necesario para reproducir canciones y emisoras.
+python-vlc>=3.0.20123
+
+# Empaquetador para generar reproductor.exe (opcional, solo para compilar).
+pyinstaller>=6.0

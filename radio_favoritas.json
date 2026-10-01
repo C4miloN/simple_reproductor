@@ -1,0 +1,22 @@
+{
+  "favoritas": [
+    {
+      "name": "nexus",
+      "url": "https://cast.animenexus.net/listen/animenexus/animenexus",
+      "genre": "Varios",
+      "country": "Internacional"
+    },
+    {
+      "name": "MegaMix",
+      "url": "https://c36.radioboss.fm:8135/stream",
+      "genre": "Mix",
+      "country": "Japan"
+    }
+  ],
+  "ultima": {
+    "name": "nexus",
+    "url": "https://cast.animenexus.net/listen/animenexus/animenexus",
+    "genre": "Varios",
+    "country": "Internacional"
+  }
+}
